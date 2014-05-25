@@ -4,9 +4,14 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"github.com/garyburd/redigo/redis"
 	"io"
 	"time"
+)
+
+var (
+	ErrInsertion = errors.New("Couldn't insert job into queue.")
 )
 
 // Job holds all the information about the job to be enqueued.
@@ -34,7 +39,7 @@ func (job *Job) toJSON() string {
 }
 
 // Enqueue insert the job into the Sidekiq queue instantly.
-func (job *Job) Enqueue(pool *redis.Pool) string {
+func (job *Job) Enqueue(pool *redis.Pool) error {
 	conn := pool.Get()
 	defer conn.Close()
 
@@ -42,18 +47,33 @@ func (job *Job) Enqueue(pool *redis.Pool) string {
 	conn.Send("LPUSH", "queue:"+job.Queue, job.toJSON())
 	conn.Flush()
 
-	return job.JID
+	// Receive the SADD response
+	res, err := redis.Int(conn.Receive())
+	if err != nil || res == 0 {
+		return ErrInsertion
+	}
+
+	// Receive the LPUSH response
+	res, err = redis.Int(conn.Receive())
+	if err != nil || res == 0 {
+		return ErrInsertion
+	}
+
+	return nil
 }
 
 // Enqueue insert the job into the Sidekiq scheduled queue at the given time.
-func (job *Job) EnqueueAt(time time.Time, pool *redis.Pool) string {
+func (job *Job) EnqueueAt(time time.Time, pool *redis.Pool) error {
 	conn := pool.Get()
 	defer conn.Close()
 
-	conn.Send("ZADD", "schedule", time.Unix(), job.toJSON())
-	conn.Flush()
+	res, err := redis.Int(conn.Do("ZADD", "schedule", time.Unix(), job.toJSON()))
 
-	return job.JID
+	if err != nil || res == 0 {
+		return ErrInsertion
+	}
+
+	return nil
 }
 
 // NewJob initialize a new job given a class, queue and arguments.
