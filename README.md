@@ -5,6 +5,12 @@ Gokiq is a small library to easily enqueue Sidekiq jobs from Go.
 ## Usage
 
 ``` go
+import (
+  "github.com/duosrx/gokiq"
+  "github.com/garyburd/redigo/redis"
+  "time"
+)
+
 // Create a Redis Pool first
 pool := redis.NewPool(func() (redis.Conn, error) {
   c, err := redis.Dial("tcp", ":6379")
