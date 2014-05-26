@@ -1,6 +1,7 @@
 package gokiq
 
 import (
+	"fmt"
 	"github.com/garyburd/redigo/redis"
 	"testing"
 	"time"
@@ -27,6 +28,15 @@ func TestGokiq(t *testing.T) {
 
 	job := NewJob("HardWorder", "default", []string{})
 	job.Enqueue(pool)
+
+	expected := fmt.Sprintf(`{"jid":"%s","retry":false,"queue":"default","class":"HardWorder","args":[],"enqueued_at":%d}`,
+		job.JID,
+		job.EnqueuedAt)
+	actual := job.toJSON()
+
+	if expected != actual {
+		t.Errorf("Excepted JSON to be %s, got %s", expected, job.toJSON())
+	}
 
 	count, _ := redis.Int(conn.Do("SISMEMBER", "queues", job.Queue))
 
