@@ -13,20 +13,20 @@ func resetRedis(pool *redis.Pool) {
 	conn.Do("FLUSHDB")
 }
 
-func TestGokiq(t *testing.T) {
-	pool := redis.NewPool(func() (redis.Conn, error) {
-		c, err := redis.Dial("tcp", ":6379")
-		if err != nil {
-			return nil, err
-		}
-		return c, err
-	}, 3)
+var pool = redis.NewPool(func() (redis.Conn, error) {
+	c, err := redis.Dial("tcp", ":6379")
+	if err != nil {
+		return nil, err
+	}
+	return c, err
+}, 3)
 
+var job = NewJob("HardWorder", "default", []string{})
+
+func TestEnqueue(t *testing.T) {
 	conn := pool.Get()
 	defer conn.Close()
-	defer pool.Close()
 
-	job := NewJob("HardWorder", "default", []string{})
 	job.Enqueue(pool)
 
 	expected := fmt.Sprintf(`{"jid":"%s","retry":false,"queue":"default","class":"HardWorder","args":[],"enqueued_at":%d}`,
@@ -50,23 +50,39 @@ func TestGokiq(t *testing.T) {
 		t.Errorf("Expected the queue to have exactly one job but found %d", count)
 	}
 
+	resetRedis(pool)
+}
+
+func TestEnqueueIn(t *testing.T) {
+	conn := pool.Get()
+	defer conn.Close()
+
 	now := time.Now()
 	job.EnqueueAt(now, pool)
 
 	score, _ := redis.Int64(conn.Do("ZSCORE", "schedule", job.toJSON()))
 
 	if score != now.Unix() {
-		t.Errorf("Expected the timestamp to be %d but got %d", score, now.Unix())
+		t.Errorf("Expected the timestamp to be %d but got %d", now.Unix(), score)
 	}
 
 	resetRedis(pool)
+}
 
+func TestEnqueueAt(t *testing.T) {
+	conn := pool.Get()
+	defer conn.Close()
+
+	now := time.Now()
 	duration, _ := time.ParseDuration("1h")
 	job.EnqueueIn(duration, pool)
 
-	score, _ = redis.Int64(conn.Do("ZSCORE", "schedule", job.toJSON()))
+	score, _ := redis.Int64(conn.Do("ZSCORE", "schedule", job.toJSON()))
+	after := now.Add(duration).Unix()
 
-	if score != now.Add(duration).Unix() {
-		t.Errorf("Expected the timestamp to be %d but got %d", score, now.Unix())
+	if score != after {
+		t.Errorf("Expected the timestamp to be %d but got %d", after, score)
 	}
+
+	resetRedis(pool)
 }
