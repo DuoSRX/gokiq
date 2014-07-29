@@ -56,8 +56,17 @@ func TestGokiq(t *testing.T) {
 	score, _ := redis.Int64(conn.Do("ZSCORE", "schedule", job.toJSON()))
 
 	if score != now.Unix() {
-		t.Errorf("Expected the timestamp to be %d but go %d", score, now.Unix())
+		t.Errorf("Expected the timestamp to be %d but got %d", score, now.Unix())
 	}
 
 	resetRedis(pool)
+
+	duration, _ := time.ParseDuration("1h")
+	job.EnqueueIn(duration, pool)
+
+	score, _ = redis.Int64(conn.Do("ZSCORE", "schedule", job.toJSON()))
+
+	if score != now.Add(duration).Unix() {
+		t.Errorf("Expected the timestamp to be %d but got %d", score, now.Unix())
+	}
 }

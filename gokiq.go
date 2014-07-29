@@ -34,7 +34,6 @@ func randomHex(n int) string {
 // toJSON serialize the code into a JSON string
 func (job *Job) toJSON() string {
 	encoded, _ := json.Marshal(job)
-
 	return string(encoded)
 }
 
@@ -62,7 +61,7 @@ func (job *Job) Enqueue(pool *redis.Pool) error {
 	return nil
 }
 
-// Enqueue insert the job into the Sidekiq scheduled queue at the given time.
+// EnqueueAt insert the job into the Sidekiq scheduled queue at the given time.
 func (job *Job) EnqueueAt(time time.Time, pool *redis.Pool) error {
 	conn := pool.Get()
 	defer conn.Close()
@@ -74,6 +73,12 @@ func (job *Job) EnqueueAt(time time.Time, pool *redis.Pool) error {
 	}
 
 	return nil
+}
+
+// EnqueueIn insert the job into the queue after the given duration
+func (job *Job) EnqueueIn(duration time.Duration, pool *redis.Pool) error {
+	t := time.Now().Add(duration)
+	return job.EnqueueAt(t, pool)
 }
 
 // NewJob initialize a new job given a class, queue and arguments.
