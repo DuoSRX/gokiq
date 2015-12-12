@@ -21,7 +21,7 @@ var pool = redis.NewPool(func() (redis.Conn, error) {
 	return c, err
 }, 3)
 
-var job = NewJob("HardWorder", "default", []string{})
+var job = NewJob("HardWorder", "default", []string{}, 0)
 
 func TestEnqueue(t *testing.T) {
 	conn := pool.Get()

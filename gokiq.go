@@ -5,9 +5,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"github.com/garyburd/redigo/redis"
 	"io"
 	"time"
+
+	"github.com/garyburd/redigo/redis"
 )
 
 var (
@@ -17,7 +18,7 @@ var (
 // Job holds all the information about the job to be enqueued.
 type Job struct {
 	JID        string   `json:"jid"`
-	Retry      bool     `json:"retry"`
+	Retry      int      `json:"retry"`
 	Queue      string   `json:"queue"`
 	Class      string   `json:"class"`
 	Args       []string `json:"args"`
@@ -82,10 +83,10 @@ func (job *Job) EnqueueIn(duration time.Duration, pool *redis.Pool) error {
 }
 
 // NewJob initialize a new job given a class, queue and arguments.
-func NewJob(class, queue string, args []string) *Job {
+func NewJob(class, queue string, args []string, retry int) *Job {
 	job := &Job{
 		JID:        randomHex(12),
-		Retry:      false,
+		Retry:      retry,
 		Queue:      queue,
 		Class:      class,
 		Args:       args,
