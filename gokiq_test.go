@@ -14,7 +14,7 @@ func resetRedis(pool *redis.Pool) {
 }
 
 var pool = redis.NewPool(func() (redis.Conn, error) {
-	c, err := redis.Dial("tcp", ":6379")
+	c, err := redis.Dial("tcp", ":6379", redis.DialDatabase(10))
 	if err != nil {
 		return nil, err
 	}
