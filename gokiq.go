@@ -17,12 +17,12 @@ var (
 
 // Job holds all the information about the job to be enqueued.
 type Job struct {
-	JID        string   `json:"jid"`
-	Retry      int      `json:"retry"`
-	Queue      string   `json:"queue"`
-	Class      string   `json:"class"`
-	Args       []string `json:"args"`
-	EnqueuedAt int64    `json:"enqueued_at"`
+	JID        string        `json:"jid"`
+	Retry      int           `json:"retry"`
+	Queue      string        `json:"queue"`
+	Class      string        `json:"class"`
+	Args       []interface{} `json:"args"`
+	EnqueuedAt int64         `json:"enqueued_at"`
 }
 
 // get generate a random string in hexadecimal form of length n * 2.
@@ -83,7 +83,7 @@ func (job *Job) EnqueueIn(duration time.Duration, pool *redis.Pool) error {
 }
 
 // NewJob initialize a new job given a class, queue and arguments.
-func NewJob(class, queue string, args []string, retry int) *Job {
+func NewJob(class, queue string, args []interface{}, retry int) *Job {
 	job := &Job{
 		JID:        randomHex(12),
 		Retry:      retry,

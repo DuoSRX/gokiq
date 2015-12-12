@@ -21,7 +21,8 @@ var pool = redis.NewPool(func() (redis.Conn, error) {
 	return c, err
 }, 3)
 
-var job = NewJob("HardWorder", "default", []string{}, 0)
+var args []interface{} = make([]interface{}, 0)
+var job = NewJob("HardWorder", "default", args, 0)
 
 func TestEnqueue(t *testing.T) {
 	conn := pool.Get()
@@ -29,7 +30,7 @@ func TestEnqueue(t *testing.T) {
 
 	job.Enqueue(pool)
 
-	expected := fmt.Sprintf(`{"jid":"%s","retry":false,"queue":"default","class":"HardWorder","args":[],"enqueued_at":%d}`,
+	expected := fmt.Sprintf(`{"jid":"%s","retry":0,"queue":"default","class":"HardWorder","args":[],"enqueued_at":%d}`,
 		job.JID,
 		job.EnqueuedAt)
 	actual := job.toJSON()
