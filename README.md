@@ -1,4 +1,4 @@
-# Gokiq
+# Gokiq [![Build Status](https://travis-ci.org/DuoSRX/gokiq.svg?branch=master)](https://travis-ci.org/DuoSRX/gokiq)
 
 Gokiq is a small library to easily enqueue Sidekiq jobs from Go.
 
@@ -30,6 +30,3 @@ now := time.Now()
 job.EnqueueAt(now, pool)
 ```
 
-## Limitations
-
-Currently you can only pass string parameters to your workers.
