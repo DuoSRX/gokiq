@@ -1,10 +1,13 @@
 package gokiq
 
 import (
+	"encoding/json"
 	"fmt"
-	"github.com/garyburd/redigo/redis"
+	"math"
 	"testing"
 	"time"
+
+	"github.com/garyburd/redigo/redis"
 )
 
 func resetRedis(pool *redis.Pool) {
@@ -27,16 +30,17 @@ var job = NewJob("HardWorder", "default", args, 0)
 func TestEnqueue(t *testing.T) {
 	conn := pool.Get()
 	defer conn.Close()
+	defer resetRedis(pool)
 
 	job.Enqueue(pool)
 
 	expected := fmt.Sprintf(`{"jid":"%s","retry":0,"queue":"default","class":"HardWorder","args":[],"enqueued_at":%d}`,
 		job.JID,
 		job.EnqueuedAt)
-	actual := job.toJSON()
+	actual, _ := json.Marshal(job)
 
-	if expected != actual {
-		t.Errorf("Excepted JSON to be %s, got %s", expected, job.toJSON())
+	if expected != string(actual) {
+		t.Errorf("Excepted JSON to be %s, got %s", expected, actual)
 	}
 
 	count, _ := redis.Int(conn.Do("SISMEMBER", "queues", job.Queue))
@@ -50,40 +54,114 @@ func TestEnqueue(t *testing.T) {
 	if count != 1 {
 		t.Errorf("Expected the queue to have exactly one job but found %d", count)
 	}
-
-	resetRedis(pool)
-}
-
-func TestEnqueueIn(t *testing.T) {
-	conn := pool.Get()
-	defer conn.Close()
-
-	now := time.Now()
-	job.EnqueueAt(now, pool)
-
-	score, _ := redis.Int64(conn.Do("ZSCORE", "schedule", job.toJSON()))
-
-	if score != now.Unix() {
-		t.Errorf("Expected the timestamp to be %d but got %d", now.Unix(), score)
-	}
-
-	resetRedis(pool)
 }
 
 func TestEnqueueAt(t *testing.T) {
 	conn := pool.Get()
 	defer conn.Close()
+	defer resetRedis(pool)
 
 	now := time.Now()
-	duration, _ := time.ParseDuration("1h")
+	job.EnqueueAt(now, pool)
+
+	b, _ := json.Marshal(job)
+	score, _ := redis.Int64(conn.Do("ZSCORE", "schedule", b))
+
+	if score != now.Unix() {
+		t.Errorf("Expected the timestamp to be %d but got %d", now.Unix(), score)
+	}
+}
+
+func TestEnqueueIn(t *testing.T) {
+	conn := pool.Get()
+	defer conn.Close()
+	defer resetRedis(pool)
+
+	now := time.Now()
+	duration := time.Hour
 	job.EnqueueIn(duration, pool)
 
-	score, _ := redis.Int64(conn.Do("ZSCORE", "schedule", job.toJSON()))
+	b, _ := json.Marshal(job)
+	score, _ := redis.Int64(conn.Do("ZSCORE", "schedule", b))
 	after := now.Add(duration).Unix()
 
 	if score != after {
 		t.Errorf("Expected the timestamp to be %d but got %d", after, score)
 	}
+}
 
-	resetRedis(pool)
+func TestMultipleEnqueue(t *testing.T) {
+	conn := pool.Get()
+	defer conn.Close()
+	defer resetRedis(pool)
+
+	job.Enqueue(pool)
+	if err := job.Enqueue(pool); err != nil {
+		t.Errorf("Expected enqueue to succeed but got %s", err)
+	}
+}
+
+func TestMultipleEnqueueAt(t *testing.T) {
+	conn := pool.Get()
+	defer conn.Close()
+	defer resetRedis(pool)
+
+	job.EnqueueAt(time.Now(), pool)
+	if err := job.EnqueueAt(time.Now(), pool); err != nil {
+		t.Errorf("Expected enqueue to succeed but got %s", err)
+	}
+}
+
+func TestMultipleEnqueueIn(t *testing.T) {
+	conn := pool.Get()
+	defer conn.Close()
+	defer resetRedis(pool)
+
+	job.EnqueueIn(5*time.Second, pool)
+	if err := job.EnqueueIn(5*time.Second, pool); err != nil {
+		t.Errorf("Expected enqueue to succeed but got %s", err)
+	}
+}
+
+func TestEnqueueReturnsMarshalError(t *testing.T) {
+	conn := pool.Get()
+	defer conn.Close()
+	defer resetRedis(pool)
+
+	job := NewJob("foo", "bar", []interface{}{map[int]string{
+		0: "Do you pronounce JSON as jay-sun or jay-さん?",
+	}}, 0)
+
+	err := job.Enqueue(pool)
+	if _, ok := err.(*json.UnsupportedTypeError); !ok {
+		t.Errorf("unexpected error: got %T, wanted *json.UnsupportedTypeError", err)
+	}
+}
+
+func TestEnqueueAtReturnsMarshalError(t *testing.T) {
+	conn := pool.Get()
+	defer conn.Close()
+	defer resetRedis(pool)
+
+	job := NewJob("foo", "bar", []interface{}{math.NaN()}, 0)
+
+	err := job.EnqueueAt(time.Now(), pool)
+	if _, ok := err.(*json.UnsupportedValueError); !ok {
+		t.Errorf("unexpected error: got %T, wanted *json.UnsupportedValueError", err)
+	}
+}
+
+func TestEnqueueInReturnsMarshalError(t *testing.T) {
+	conn := pool.Get()
+	defer conn.Close()
+	defer resetRedis(pool)
+
+	job := NewJob("foo", "bar", []interface{}{map[string]interface{}{
+		"rpc magic": func(a, b int) int { return a + b },
+	}}, 0)
+
+	err := job.EnqueueAt(time.Now(), pool)
+	if _, ok := err.(*json.UnsupportedTypeError); !ok {
+		t.Errorf("unexpected error: got %T, wanted *json.UnsupportedTypeError", err)
+	}
 }
