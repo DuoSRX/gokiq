@@ -5,6 +5,7 @@ go:
 
 install:
   - go get github.com/garyburd/redigo/redis
+  - go get github.com/stvp/tempredis
 
 services:
   - redis
