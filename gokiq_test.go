@@ -8,29 +8,29 @@ import (
 	"time"
 
 	"github.com/garyburd/redigo/redis"
+	"github.com/stvp/tempredis"
 )
 
-func resetRedis(pool *redis.Pool) {
-	conn := pool.Get()
-	defer conn.Close()
-	conn.Do("FLUSHDB")
-}
-
+var server, err = tempredis.Start(tempredis.Config{})
 var pool = redis.NewPool(func() (redis.Conn, error) {
-	c, err := redis.Dial("tcp", ":6379", redis.DialDatabase(10))
+	c, err := redis.Dial("unix", server.Socket())
 	if err != nil {
 		return nil, err
 	}
 	return c, err
 }, 3)
 
+func resetRedis(conn redis.Conn) {
+	conn.Do("FLUSHDB")
+	conn.Close()
+}
+
 var args []interface{} = make([]interface{}, 0)
 var job = NewJob("HardWorder", "default", args, 0)
 
 func TestEnqueue(t *testing.T) {
 	conn := pool.Get()
-	defer conn.Close()
-	defer resetRedis(pool)
+	defer resetRedis(conn)
 
 	job.Enqueue(pool)
 
@@ -58,8 +58,7 @@ func TestEnqueue(t *testing.T) {
 
 func TestEnqueueAt(t *testing.T) {
 	conn := pool.Get()
-	defer conn.Close()
-	defer resetRedis(pool)
+	defer resetRedis(conn)
 
 	now := time.Now()
 	job.EnqueueAt(now, pool)
@@ -74,8 +73,7 @@ func TestEnqueueAt(t *testing.T) {
 
 func TestEnqueueIn(t *testing.T) {
 	conn := pool.Get()
-	defer conn.Close()
-	defer resetRedis(pool)
+	defer resetRedis(conn)
 
 	now := time.Now()
 	duration := time.Hour
@@ -92,8 +90,7 @@ func TestEnqueueIn(t *testing.T) {
 
 func TestMultipleEnqueue(t *testing.T) {
 	conn := pool.Get()
-	defer conn.Close()
-	defer resetRedis(pool)
+	defer resetRedis(conn)
 
 	job.Enqueue(pool)
 	if err := job.Enqueue(pool); err != nil {
@@ -103,8 +100,7 @@ func TestMultipleEnqueue(t *testing.T) {
 
 func TestMultipleEnqueueAt(t *testing.T) {
 	conn := pool.Get()
-	defer conn.Close()
-	defer resetRedis(pool)
+	defer resetRedis(conn)
 
 	job.EnqueueAt(time.Now(), pool)
 	if err := job.EnqueueAt(time.Now(), pool); err != nil {
@@ -114,8 +110,7 @@ func TestMultipleEnqueueAt(t *testing.T) {
 
 func TestMultipleEnqueueIn(t *testing.T) {
 	conn := pool.Get()
-	defer conn.Close()
-	defer resetRedis(pool)
+	defer resetRedis(conn)
 
 	job.EnqueueIn(5*time.Second, pool)
 	if err := job.EnqueueIn(5*time.Second, pool); err != nil {
@@ -125,8 +120,7 @@ func TestMultipleEnqueueIn(t *testing.T) {
 
 func TestEnqueueReturnsMarshalError(t *testing.T) {
 	conn := pool.Get()
-	defer conn.Close()
-	defer resetRedis(pool)
+	defer resetRedis(conn)
 
 	job := NewJob("foo", "bar", []interface{}{map[int]string{
 		0: "Do you pronounce JSON as jay-sun or jay-さん?",
@@ -140,8 +134,7 @@ func TestEnqueueReturnsMarshalError(t *testing.T) {
 
 func TestEnqueueAtReturnsMarshalError(t *testing.T) {
 	conn := pool.Get()
-	defer conn.Close()
-	defer resetRedis(pool)
+	defer resetRedis(conn)
 
 	job := NewJob("foo", "bar", []interface{}{math.NaN()}, 0)
 
@@ -153,8 +146,7 @@ func TestEnqueueAtReturnsMarshalError(t *testing.T) {
 
 func TestEnqueueInReturnsMarshalError(t *testing.T) {
 	conn := pool.Get()
-	defer conn.Close()
-	defer resetRedis(pool)
+	defer resetRedis(conn)
 
 	job := NewJob("foo", "bar", []interface{}{map[string]interface{}{
 		"rpc magic": func(a, b int) int { return a + b },
