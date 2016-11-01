@@ -122,7 +122,7 @@ func TestEnqueueReturnsMarshalError(t *testing.T) {
 	conn := pool.Get()
 	defer resetRedis(conn)
 
-	job := NewJob("foo", "bar", []interface{}{map[int]string{
+	job := NewJob("foo", "bar", []interface{}{map[float32]string{
 		0: "Do you pronounce JSON as jay-sun or jay-さん?",
 	}}, 0)
 
