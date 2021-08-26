@@ -7,7 +7,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/garyburd/redigo/redis"
+	"github.com/gomodule/redigo/redis"
 )
 
 // Job holds all the information about the job to be enqueued.

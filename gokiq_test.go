@@ -7,18 +7,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/garyburd/redigo/redis"
-	"github.com/stvp/tempredis"
+	"github.com/gomodule/redigo/redis"
 )
 
-var server, err = tempredis.Start(tempredis.Config{})
-var pool = redis.NewPool(func() (redis.Conn, error) {
-	c, err := redis.Dial("unix", server.Socket())
-	if err != nil {
-		return nil, err
-	}
-	return c, err
-}, 3)
+var pool = &redis.Pool{
+	MaxIdle:     3,
+	IdleTimeout: 240 * time.Second,
+	Dial: func() (redis.Conn, error) {
+		return redis.Dial("tcp", ":6379")
+	},
+}
 
 func resetRedis(conn redis.Conn) {
 	conn.Do("FLUSHDB")
@@ -26,7 +24,7 @@ func resetRedis(conn redis.Conn) {
 }
 
 var args []interface{} = make([]interface{}, 0)
-var job = NewJob("HardWorder", "default", args, 0)
+var job = NewJob("HardWorker", "default", args, 0)
 
 func TestEnqueue(t *testing.T) {
 	conn := pool.Get()
@@ -34,7 +32,7 @@ func TestEnqueue(t *testing.T) {
 
 	job.Enqueue(pool)
 
-	expected := fmt.Sprintf(`{"jid":"%s","retry":0,"queue":"default","class":"HardWorder","args":[],"enqueued_at":%d}`,
+	expected := fmt.Sprintf(`{"jid":"%s","retry":0,"queue":"default","class":"HardWorker","args":[],"enqueued_at":%d}`,
 		job.JID,
 		job.EnqueuedAt)
 	actual, _ := json.Marshal(job)
